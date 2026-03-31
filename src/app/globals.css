@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdfdfd;
+  --foreground: #0a0a0a;
+  --accent: #2d5a27;
+  --accent-soft: #f1f8ee;
+  --amber: #ffa000;
+  --amber-soft: #fff9ed;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #f0f0f0;
+  /* Safe area insets for iOS/PWA */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-nav-height: 72px;
+}
+
+html, body {
+  min-height: 100%;
+  background: var(--background);
+  overscroll-behavior-y: none;
+}
+
+body {
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Give mobile pages breathing room above the bottom nav - REMOVED GLOBAL BODY PADDING TO FIX WHITE GAP */
+@media (max-width: 767px) {
+  /* Padding is now handled at the component level (Footer, individual pages) */
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+  
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .shadow-premium {
+    box-shadow: 0 20px 40px -15px rgba(0,0,0,0.05);
+  }
+
+  .shadow-premium-hover {
+    box-shadow: 0 30px 60px -12px rgba(0,0,0,0.12);
+  }
+
+  /* Momentum scrolling for app-like feel */
+  .scroll-smooth-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
+  }
+
+  /* No-scrollbar for horizontal category chips */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch-optimized tap target */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Custom scrollbar for premium desktop */
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e2e2e2;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ccc;
+  }
+
+  /* Organic Fruit-themed Utilities */
+  .bg-organic-green {
+    background-color: var(--accent-soft);
+  }
+  .bg-organic-amber {
+    background-color: var(--amber-soft);
+  }
+  .text-organic-green {
+    color: var(--accent);
+  }
+  .text-organic-amber {
+    color: var(--amber);
+  }
+  
+  .blob-shape {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+  }
+
+  .leaf-pattern {
+    background-image: radial-gradient(circle at 2px 2px, rgba(45, 90, 39, 0.03) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  /* Safe area padding utilities */
+  .pb-safe {
+    padding-bottom: var(--safe-area-bottom);
+  }
+  .pt-safe {
+    padding-top: var(--safe-area-top);
+  }
+}
+
+/* Hide Next.js and Vercel dev indicators for a cleaner look during user testing */
+#vk-indicator, 
+#__next-hot-reload-indicator,
+#nextjs-dev-overlay-container,
+[data-nextjs-toast],
+[data-vercel-indicator],
+[data-nextjs-indicator] {
+  display: none !important;
+}

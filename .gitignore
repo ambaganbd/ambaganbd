@@ -1,0 +1,63 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.local
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# PWA
+/public/sw.js
+/public/workbox-*.js
+/public/worker-*.js
+/public/sw.js.map
+/public/workbox-*.js.map
+
+# Afra Tech Local Data & Utility
+/data/
+/deploy_to_vercel/
+create_zip.ps1
+README_DEPLOY.md
+
+# Ignored Secrets/Test files & All Backup Env Files
+test-admin.js
+tracked.txt
+.env_backup*
+.env*.backup*
+.env.local.backup*
+# Private key files (Firebase service account etc.)
+*-service-account*.json
+*private-key*.json
+*.key
+# OS artifacts
+.DS_Store
+Thumbs.db

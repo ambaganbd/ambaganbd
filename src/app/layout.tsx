@@ -1,0 +1,173 @@
+import React from "react";
+import type { Metadata, Viewport } from "next";
+
+
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { storage } from "@/lib/storage";
+import ClientLayout from "@/components/ClientLayout";
+import SettingsProvider from "@/components/SettingsProvider";
+import { THEMES, ThemeId } from "@/lib/themes";
+import { AuthProvider } from "@/contexts/AuthContext";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+
+const defaultSettings = {
+  storeName: "Am Bagan BD",
+  logoUrl: "/logo.png",
+  contactEmail: "ambaganbd24@gmail.com",
+  contactPhone: "+880 1XXXXXXXXX",
+  contactAddress: "Rajshahi, Bangladesh",
+  shortDescription: "Your premium destination for authentic, orchard-fresh mangoes and seasonal fruits direct from Rajshahi.",
+  currencySymbol: "৳",
+  themeId: "mango" as ThemeId,
+  announcementText: "Fresh Mango Season is Live!",
+  announcementActive: true,
+  navLinks: [],
+  socialLinks: [],
+  footerProducts: [],
+  footerCompany: [],
+  banners: [],
+  categories: [],
+  paymentMethods: [
+    { id: "1", name: "bKash", accountNumber: "", enabled: true },
+    { id: "2", name: "Nagad", accountNumber: "", enabled: true },
+    { id: "3", name: "Rocket", accountNumber: "", enabled: true },
+  ],
+  codEnabled: true,
+  deliveryCharge: 0,
+  orchardMoments: []
+};
+
+import { headers } from "next/headers";
+
+export async function generateMetadata(): Promise<Metadata> {
+  let settings: any = defaultSettings;
+  try {
+    const fetchedSettings = await storage.getSettings();
+    if (fetchedSettings && !Array.isArray(fetchedSettings)) {
+      settings = fetchedSettings;
+    }
+  } catch (e) {
+    console.warn("[Layout Metadata] Failed to fetch settings, using defaults.");
+  }
+
+  // Safe host detection for admin subdomain
+  let isAdminSubdomain = false;
+  try {
+    const headersList = await headers();
+    const host = headersList.get('host') || "";
+    isAdminSubdomain = host.startsWith('admin.');
+  } catch (e) {
+    // Silent fail for non-browser/build contexts
+  }
+
+  if (isAdminSubdomain) {
+    return {
+      title: "Admin Panel | " + settings.storeName,
+      description: "Manage your store.",
+      manifest: "/api/manifest/admin",
+    };
+  }
+
+  return {
+    title: settings.storeName,
+    description: settings.shortDescription,
+    manifest: "/api/manifest/shop",
+    icons: {
+      icon: settings.logoUrl || "/logo.png",
+      apple: settings.logoUrl || "/logo.png",
+    },
+  };
+}
+
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  let settings: any = defaultSettings;
+  
+  try {
+    const fetchedSettings = await storage.getSettings();
+    if (fetchedSettings && !Array.isArray(fetchedSettings) && Object.keys(fetchedSettings).length > 0) {
+      settings = fetchedSettings;
+    }
+  } catch (e) {
+    console.error("[RootLayout] Critical settings fetch error, falling back to static defaults.");
+  }
+
+  const themeId = (settings.themeId as ThemeId) || "mango";
+  const theme = THEMES[themeId] || THEMES.mango;
+
+  return (
+    <html lang="en" className="bg-[#f9fafb] overscroll-y-none" suppressHydrationWarning>
+      <head>
+        <meta name="format-detection" content="telephone=no" />
+        <link rel="preconnect" href="https://ik.imagekit.io" />
+        <link rel="dns-prefetch" href="https://ik.imagekit.io" />
+        
+        {/* Preload the logo — very high priority */}
+        {settings.logoUrl && (
+          <link
+            rel="preload"
+            as="image"
+            href={`${settings.logoUrl}${settings.logoUrl.includes('?') ? '&' : '?'}tr=w-300,f-auto,q-80`}
+            // @ts-ignore
+            fetchPriority="high"
+          />
+        )}
+        {/* Preload the first hero banner image — eliminates LCP discovery delay */}
+        {settings.banners?.[0]?.imageUrl && (
+          <link
+            rel="preload"
+            as="image"
+            href={`${settings.banners[0].imageUrl}${settings.banners[0].imageUrl.includes('?') ? '&' : '?'}tr=w-800,f-auto,q-80`}
+            // @ts-ignore
+            fetchPriority="high"
+          />
+        )}
+        <style
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root {
+                --primary: ${theme.primary};
+                --primary-hover: ${theme.hover};
+                --primary-text: ${theme.text};
+                --primary-accent: ${theme.accent};
+              }
+            `,
+          }}
+        />
+      </head>
+      <body className={`${inter.className} min-h-[100dvh] bg-[#f9fafb] overscroll-y-none overflow-x-hidden`} suppressHydrationWarning>
+        <AuthProvider>
+          <SettingsProvider initialSettings={settings}>
+            {settings.announcementActive && settings.announcementText && (
+              <div 
+                className="w-full text-center py-2 px-4 shadow-sm text-xs font-bold z-[110] relative transition-colors duration-500"
+                style={{ 
+                  backgroundColor: 'var(--primary)',
+                  color: 'var(--primary-text)' 
+                }}
+              >
+                {settings.announcementText}
+              </div>
+            )}
+            <ClientLayout>
+              <main id="main-content">
+                {children}
+              </main>
+            </ClientLayout>
+          </SettingsProvider>
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
