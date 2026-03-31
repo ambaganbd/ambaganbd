@@ -171,6 +171,21 @@ export async function updateProductInFirestore(id: string, data: any) {
   await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
 }
 
+// ── Real-time subscription for ALL products (admin) ─────────────────────────
+export function subscribeToProducts(callback: (products: any[]) => void) {
+  const q = query(
+    collection(db!, "products"),
+    orderBy("createdAt", "desc")
+  );
+
+  return onSnapshot(q, (snap) => {
+    const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    callback(products);
+  }, (error) => {
+    console.error("Error subscribing to products:", error);
+  });
+}
+
 export async function deleteProductFromFirestore(id: string) {
   const { deleteDoc } = await import("firebase/firestore");
   await deleteDoc(doc(db!, "products", id));

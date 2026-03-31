@@ -14,10 +14,12 @@ import {
 import PremiumLoader from "@/components/PremiumLoader";
 import { cn } from "@/lib/utils";
 import { authenticatedFetch } from "@/lib/api-helper";
+import { subscribeToAllOrders } from "@/lib/firebase/firestore";
 
 interface Order {
   id: string;
-  createdAt: string;
+  createdAt: Date;
+  updatedAt?: Date;
   total?: number;
   totalAmount?: number;
   paymentStatus?: string;
@@ -147,21 +149,12 @@ export default function AdminOrdersPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
   useEffect(() => {
-    const fetchOrders = () => {
-      authenticatedFetch("/api/orders", { cache: "no-store" })
-        .then(r => r.json())
-        .then((data: Order[]) => { 
-          if (Array.isArray(data)) {
-            setOrders(data); 
-          }
-          setLoading(false); 
-        })
-        .catch(() => setLoading(false));
-    };
-
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 3 * 60 * 1000); // 3 minutes — saves Firestore quota
-    return () => clearInterval(interval);
+    setLoading(true);
+    const unsubscribe = subscribeToAllOrders((data) => {
+      setOrders(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const patchOrder = useCallback(async (orderId: string, fields: Record<string, string>) => {

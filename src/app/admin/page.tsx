@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useSettings } from "@/components/SettingsProvider";
 import { authenticatedFetch } from "@/lib/api-helper";
+import { subscribeToAllOrders, subscribeToProducts } from "@/lib/firebase/firestore";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ orders: 0, products: 0, customers: 0, completedOrders: 0, traffic: 0 });
@@ -13,30 +14,40 @@ export default function AdminDashboard() {
   const settings = useSettings();
 
   useEffect(() => {
-    const loadStats = async () => {
+    // 1. Initial/Periodic Customer Count (doesn't need to be real-time)
+    const loadCustomerCount = async () => {
       try {
-        const [orders, products, customerData] = await Promise.all([
-          authenticatedFetch('/api/orders').then(r => r.json()),
-          authenticatedFetch('/api/products').then(r => r.json()),
-          authenticatedFetch('/api/admin/customer-count').then(r => r.json()).catch(() => ({ count: 0 }))
-        ]);
-
-        const completed = orders.filter((o: any) => o.status === "delivered" || o.orderStatus === "delivered").length;
-        
-        setStats({ 
-          orders: orders.length, 
-          products: products.length,
-          customers: customerData.count || 0,
-          completedOrders: completed,
-          traffic: 0
-        });
-        setRecentOrders(orders.slice(0, 5));
+        const customerData = await authenticatedFetch('/api/admin/customer-count')
+          .then(r => r.json())
+          .catch(() => ({ count: 0 }));
+        setStats(prev => ({ ...prev, customers: customerData.count || 0 }));
       } catch (err) {
-        console.error("Dashboard Stats Error:", err);
+        console.error("Dashboard Customer Count Error:", err);
       }
     };
+
+    // 2. Real-time Orders (Metrics + Recent List)
+    const unsubOrders = subscribeToAllOrders((orders) => {
+      const completed = orders.filter((o: any) => o.status === "delivered" || o.orderStatus === "delivered").length;
+      setStats(prev => ({ 
+        ...prev, 
+        orders: orders.length, 
+        completedOrders: completed 
+      }));
+      setRecentOrders(orders.slice(0, 5));
+    });
+
+    // 3. Real-time Products (Metrics)
+    const unsubProducts = subscribeToProducts((products) => {
+      setStats(prev => ({ ...prev, products: products.length }));
+    });
+
+    loadCustomerCount();
     
-    loadStats();
+    return () => {
+      unsubOrders();
+      unsubProducts();
+    };
   }, []);
 
   const metrics = [

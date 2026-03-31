@@ -93,42 +93,60 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid items" }, { status: 400 });
     }
 
-    // ── Server-Side Price Calculation (SECURITY FIX) ──
+    // ── Server-Side Price & Delivery Calculation (SECURITY FIX) ──
     const allProducts = await storage.getProducts();
     const settings = await storage.getSettings();
-    const deliveryCharge = Number(settings?.deliveryCharge) || 0;
+    const globalDeliveryCharge = Number(settings?.deliveryCharge) || 0;
 
     let calculatedSubtotal = 0;
+    let calculatedDeliveryCharge = 0;
+
     const validatedItems = items.map((item: any) => {
       const product = allProducts.find((p: any) => p.id === item.productId);
       if (!product) {
         throw new Error(`Product ${item.productId} not found`);
       }
 
-      let price = product.salePrice || product.regularPrice || product.price || 0;
+      let price = Number(product.salePrice) || Number(product.regularPrice) || Number(product.price) || 0;
+      let itemDeliveryCharge = globalDeliveryCharge;
       
-      // If variant is selected, check variant price
+      // If variant is selected, check variant price and its own delivery charge
       if (item.variantName && product.variants) {
-        const variant = product.variants.find((v: any) => v.name === item.variantName);
+        const variant = product.variants.find((v: any) => 
+          v.name?.toString().toLowerCase() === item.variantName.toString().toLowerCase() ||
+          v.id === item.variantName ||
+          (v.name + " kg").toLowerCase() === item.variantName.toString().toLowerCase()
+        );
+
         if (variant) {
-          price = variant.salePrice ?? variant.regularPrice ?? price;
+          price = Number(variant.salePrice) || Number(variant.regularPrice) || price;
+          if (variant.deliveryCharge) {
+            itemDeliveryCharge = Number(variant.deliveryCharge);
+          }
         }
       }
 
       const quantity = Math.max(1, Number(item.quantity) || 1);
       calculatedSubtotal += price * quantity;
+      calculatedDeliveryCharge += itemDeliveryCharge * quantity;
 
       return {
         productId: item.productId,
         name: product.name,
-        price: price, // Use server price
+        price: price,
         quantity: quantity,
         image: product.image,
         variantName: item.variantName || null,
       };
     });
 
+    const deliveryCharge = calculatedDeliveryCharge;
     const calculatedTotal = calculatedSubtotal + deliveryCharge;
+
+    // Reject orders with 0 total amount (Safety check)
+    if (calculatedSubtotal <= 0) {
+      throw new Error("Order subtotal calculation failed. Please check product pricing.");
+    }
 
     // storage.createOrder handles ID generation and persistence
     const newOrder = await storage.createOrder({
