@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import PremiumLoader from "@/components/PremiumLoader";
 import PushNotificationManager from "@/components/PushNotificationManager";
-import { authenticatedFetch } from "@/lib/api-helper";
+import { subscribeToNewOrdersCount } from "@/lib/firebase/firestore";
 
 export default function AdminClientLayout({
   children,
@@ -84,6 +84,18 @@ export default function AdminClientLayout({
       }
     };
 
+    // Real-time listener for new order count & sound
+    const unsubscribe = subscribeToNewOrdersCount((newCount) => {
+      // If count increases, play sound
+      if (newCount > prevCountRef.current) {
+        playNotification();
+        // Broadcast to other tabs
+        bc.postMessage({ type: "UPDATE_ORDER_COUNT", count: newCount });
+      }
+      setNewOrdersCount(newCount);
+      prevCountRef.current = newCount;
+    });
+
     bc.onmessage = (event) => {
       if (event.data?.type === "UPDATE_ORDER_COUNT") {
         const newCount = event.data.count;
@@ -95,32 +107,8 @@ export default function AdminClientLayout({
       }
     };
 
-    const fetchOrderCount = async () => {
-      try {
-        const res = await authenticatedFetch("/api/admin/order-count", { cache: "no-store" });
-        const data = await res.json();
-        if (data.count !== undefined) {
-          if (data.count > prevCountRef.current) {
-            playNotification();
-            // Broadcast to other tabs
-            bc.postMessage({ type: "UPDATE_ORDER_COUNT", count: data.count });
-          }
-          setNewOrdersCount(data.count);
-          prevCountRef.current = data.count;
-        }
-      } catch (err) {
-        console.error("Failed to poll order count:", err);
-      }
-    };
-
-    // Initial fetch
-    fetchOrderCount();
-
-    // Poll every 5 minutes to stay within Firebase free quota (was 5s = 17,280 reads/day!)
-    const interval = setInterval(fetchOrderCount, 5 * 60 * 1000);
-
     return () => {
-      clearInterval(interval);
+      unsubscribe();
       bc.close();
     };
   }, [hasAccess, loading]);
