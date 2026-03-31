@@ -164,73 +164,68 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    // ── Send Email Notifications ─────────────────────────────────────
-    // We use Promise.allSettled to ensure that even if emails fail 
-    // (e.g., missing SMTP config or network issues), the order creation proceeds.
-    try {
-      const settings = await storage.getSettings();
-      const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER || "ambaganbd24@gmail.com";
-      const customerEmail = body.userEmail || body.email || body.customer?.email;
-      
-      const logoUrl = settings?.logoUrl;
-      const shopUrl = settings?.shopUrl;
+    // ── Send Email Notifications (Non-blocking background task) ─────────────────
+    // We do NOT await this to ensure the API response is returned immediately.
+    // This allows the checkout to finish and the admin live-update to trigger instantly.
+    (async () => {
+      try {
+        const settings = await storage.getSettings();
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER || "ambaganbd24@gmail.com";
+        const customerEmail = body.userEmail || body.email || body.customer?.email;
+        
+        const logoUrl = settings?.logoUrl;
+        const shopUrl = settings?.shopUrl;
 
-      if (customerEmail) {
-        const discountAmount = Number(body.discount) || 0;
-        const results = await Promise.allSettled([
-          // 1. Sent to Customer
-          sendEmail({
-            to: customerEmail,
-            subject: `Order Confirmation #${newOrder.id.slice(0, 8).toUpperCase()}`,
-            template: OrderConfirmation,
-            props: {
-              customerName: shippingAddress?.fullName || body.customer?.name || 'Customer',
-              orderId: newOrder.id,
-              items: validatedItems,
-              total: calculatedTotal,
-              deliveryCharge: deliveryCharge,
-              discount: discountAmount,
-              paymentMethod: payment?.method || "Cash on Delivery",
-              shippingAddress: shippingAddress,
-              orderDate: newOrder.createdAt,
-              logoUrl,
-              shopUrl
-            }
-          }),
-          // 2. Sent to Administrator
-          sendEmail({
-            to: adminEmail,
-            subject: `🚨 New Order Received: #${newOrder.id.slice(0, 8).toUpperCase()}`,
-            template: NewOrderAdminNotification,
-            props: {
-              orderId: newOrder.id,
-              customerName: shippingAddress?.fullName || body.customer?.name || 'Customer',
-              customerEmail: customerEmail,
-              total: calculatedTotal,
-              items: validatedItems,
-              deliveryCharge: deliveryCharge,
-              discount: discountAmount,
-              paymentMethod: payment?.method || "Cash on Delivery",
-              shippingAddress: shippingAddress,
-              logoUrl,
-              shopUrl
-            }
-          })
-        ]);
-
-        results.forEach((res, i) => {
-          if (res.status === 'rejected') {
-            console.error(`Order Email ${i} failed:`, res.reason);
-          } else {
-            console.log(`Order Email ${i} sent successfully.`);
-          }
-        });
-      } else {
-        console.warn("No customer email found in order payload. Skipping customer notification.");
+        if (customerEmail) {
+          const discountAmount = Number(body.discount) || 0;
+          
+          Promise.allSettled([
+            // 1. Sent to Customer
+            sendEmail({
+              to: customerEmail,
+              subject: `Order Confirmation #${newOrder.id.slice(0, 8).toUpperCase()}`,
+              template: OrderConfirmation,
+              props: {
+                customerName: shippingAddress?.fullName || body.customer?.name || 'Customer',
+                orderId: newOrder.id,
+                items: validatedItems,
+                total: calculatedTotal,
+                deliveryCharge: deliveryCharge,
+                discount: discountAmount,
+                paymentMethod: payment?.method || "Cash on Delivery",
+                shippingAddress: shippingAddress,
+                orderDate: newOrder.createdAt,
+                logoUrl,
+                shopUrl
+              }
+            }),
+            // 2. Sent to Administrator
+            sendEmail({
+              to: adminEmail,
+              subject: `🚨 New Order Received: #${newOrder.id.slice(0, 8).toUpperCase()}`,
+              template: NewOrderAdminNotification,
+              props: {
+                orderId: newOrder.id,
+                customerName: shippingAddress?.fullName || body.customer?.name || 'Customer',
+                customerEmail: customerEmail,
+                total: calculatedTotal,
+                items: validatedItems,
+                deliveryCharge: deliveryCharge,
+                discount: discountAmount,
+                paymentMethod: payment?.method || "Cash on Delivery",
+                shippingAddress: shippingAddress,
+                logoUrl,
+                shopUrl
+              }
+            })
+          ]).then(results => {
+            console.log(`[Email] Background email results for order ${newOrder.id}:`, results);
+          });
+        }
+      } catch (emailErr: any) {
+        console.error("[Email] Critical background error during setup:", emailErr.message);
       }
-    } catch (emailErr) {
-      console.warn("Non-blocking email notification failure:", emailErr);
-    }
+    })();
 
     return NextResponse.json(newOrder, { status: 201 });
   } catch (err: any) {
